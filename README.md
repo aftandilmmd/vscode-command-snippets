@@ -1,73 +1,127 @@
+<div align="center">
+
 # Command Snippets
 
-Keep your reusable terminal commands in the VS Code sidebar, organise them into groups, and run
-them in the integrated terminal with one click.
+**Stop retyping the same commands. Save them once, run them with one click.**
 
-## Features
+[![Marketplace](https://img.shields.io/visual-studio-marketplace/v/aftandilmmd.command-snippets?color=0F172A&label=marketplace)](https://marketplace.visualstudio.com/items?itemName=aftandilmmd.command-snippets)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/aftandilmmd.command-snippets?color=0F172A)](https://marketplace.visualstudio.com/items?itemName=aftandilmmd.command-snippets)
+[![License](https://img.shields.io/badge/license-MIT-0F172A)](LICENSE)
 
-- **Sidebar panel** with two tabs: **Snippets** and **History**.
-- **Snippets**: create, edit, delete (with confirmation), copy, and run.
-- **Groups**: create, rename, delete. Deleting a group moves its snippets to *Ungrouped* — it never
-  deletes them. Groups render as collapsible sections and the collapse state is remembered.
-- **Move** a snippet to another group from the row's ➜ button.
-- **Search** filters by name, command and description while you type (case-insensitive).
-- **Sort** by name (A–Z / Z–A), created date, last updated, or last run.
-- **Run** (▶) sends the command to a dedicated terminal named `Command Snippets`. The terminal is
-  reused when it is still alive and recreated if you close it.
-- **Command Palette**: `Command Snippets: Run Snippet` (`Ctrl+Alt+R` / `Cmd+Alt+R`) opens a QuickPick
-  of every snippet, most recently run first.
-- **History**: newest first, relative times ("2 min ago") with the full timestamp on hover, per-entry
-  **Re-run**, **Save as snippet** and **Copy**, plus **Clear history**. Capped at 500 entries.
-- **Export / Import** the whole dataset as JSON. Import merges by id and asks before overwriting.
+</div>
 
-## Usage
+---
 
-1. Click the terminal icon in the Activity Bar to open **Command Snippets**.
-2. **New snippet** → give it a name, the command, an optional description and a group → **Save**.
-3. Hover a snippet row and press ▶ to run it (or double-click the row).
-4. Switch to **History** to re-run anything you ran before.
+That deploy command with four flags. The one docker incantation that actually works. The test
+filter you rebuild from memory every single time.
 
-All data lives in `context.globalState` under `commandSnippets.data.v1`, so snippets follow you
-across workspaces.
+Put them in the sidebar. Hit ▶.
 
-## Commands
+## What you get
 
-| Command | Id | Default keybinding |
+**One click to run.** Every snippet runs in a dedicated terminal that gets reused, not respawned.
+Close it and the next run brings it back.
+
+**Groups that make sense.** Build, deploy, database — collapsible sections, drag a snippet to
+another group from the row. Delete a group and your snippets survive as *Ungrouped*.
+
+**Find it instantly.** Live search across name, command and description. Sort by name, newest,
+recently edited or recently run.
+
+**Never lose a command again.** Everything you run lands in **History** with a relative timestamp.
+Re-run it, or save that ad-hoc one-liner as a proper snippet.
+
+**Keyboard first.** `Cmd+Alt+R` / `Ctrl+Alt+R` opens a QuickPick of every snippet, most recently
+used first.
+
+**Share with your team.** Project snippets live in `.vscode/command-snippets.json`. Commit it and
+your teammates get the same commands on clone.
+
+**Your AI agent can manage them.** Ships with an MCP server — see below.
+
+## Quick start
+
+1. Click the terminal icon in the Activity Bar.
+2. **＋ → New snippet**, paste your command, save.
+3. Hover the row and hit ▶. That's it.
+
+## Let your AI agent handle it
+
+> *"add a snippet for running the e2e tests against staging"*
+
+Command Snippets bundles an MCP server, so Claude Code, Cursor, Claude Desktop or any MCP client
+can list, create, edit, group and delete your snippets — and the sidebar updates the moment they
+do.
+
+Run **Command Snippets: Copy MCP Server Config** from the Command Palette, then paste. Or:
+
+```bash
+claude mcp add command-snippets -- node <extension-path>/dist/mcp-server.js
+```
+
+In VS Code itself there is nothing to configure at all: Copilot agent mode picks up
+`#commandSnippets`, `#newCommandSnippet`, `#updateCommandSnippet` and `#deleteCommandSnippet`
+automatically.
+
+### About letting a model touch your terminal
+
+Writing snippets is harmless. Running them is not, so that half is locked down:
+
+- `run_snippet` **does not exist** unless you flip `commandSnippets.mcp.allowRun` on *and* VS Code
+  is open. An agent cannot call a tool it never sees.
+- No tool anywhere accepts a free-form command string — only the id of a snippet **you** already
+  saved. Prompt injection has nothing to execute.
+- Every run still asks you first, showing the exact command. Say no and the agent is told.
+
+## Your data stays yours
+
+Plain JSON, on your disk, editable by hand:
+
+| File | What's in it |
+| --- | --- |
+| `~/.command-snippets/data.json` | Your global snippets, groups and history |
+| `<project>/.vscode/command-snippets.json` | Project snippets — commit them, share them |
+
+Both files are watched, so an edit in your editor (or by an agent, or from `git pull`) shows up in
+the sidebar immediately. Export and import as JSON any time.
+
+## Commands & settings
+
+| Command | Keybinding |
+| --- | --- |
+| Run Snippet | `Cmd+Alt+R` / `Ctrl+Alt+R` |
+| New Snippet · New Group · Refresh | — |
+| Export Data… · Import Data… · Open Data File | — |
+| Copy MCP Server Config | — |
+
+| Setting | Default | |
 | --- | --- | --- |
-| Run Snippet | `commandSnippets.run` | `Ctrl+Alt+R` / `Cmd+Alt+R` |
-| New Snippet | `commandSnippets.newSnippet` | — |
-| New Group | `commandSnippets.newGroup` | — |
-| Refresh | `commandSnippets.refresh` | — |
-| Export Data… | `commandSnippets.export` | — |
-| Import Data… | `commandSnippets.import` | — |
+| `commandSnippets.workspaceFile.enabled` | `true` | Keep project snippets in `.vscode/command-snippets.json` |
+| `commandSnippets.mcp.allowRun` | `false` | Let an agent *ask* to run a snippet (you still confirm) |
 
-## Development
+## Contributing
 
 ```bash
 npm install
-npm run compile     # bundle with esbuild into dist/
-npm run watch       # rebuild on change
-npm test            # unit tests for the store (Mocha)
-npm run package     # typecheck + production bundle
-npm run vsce        # build a .vsix
+npm run watch     # rebuild on change
+npm test          # unit + MCP integration tests
+npm run package   # typecheck + production bundle
 ```
 
-Then press <kbd>F5</kbd> in VS Code to launch the Extension Development Host.
+Then press <kbd>F5</kbd> for an Extension Development Host.
 
-### Layout
-
-| Path | Purpose |
+| Path | |
 | --- | --- |
-| `src/extension.ts` | Activation and command registration |
-| `src/store.ts` | Typed state, persistence, change events, sort/filter/move logic |
-| `src/snippetsViewProvider.ts` | `WebviewViewProvider` and the typed message bridge |
-| `src/runner.ts` | Runs snippets and records history |
-| `src/terminal.ts` | Dedicated terminal management |
-| `src/messages.ts` | Message union + runtime validation of webview messages |
-| `media/` | Webview `main.js` / `main.css` (no frameworks) |
+| `src/store.ts` | State, dual-source routing, sort/filter/move logic |
+| `src/storage/` | Atomic JSON files + one-time migration |
+| `src/snippetsViewProvider.ts` | Webview view and its typed message bridge |
+| `src/mcp/server.ts` | The bundled stdio MCP server |
+| `src/runRequests.ts` | VS Code side of the agent run handshake |
+| `media/` | Webview JS/CSS — no frameworks, themed with `--vscode-*` variables |
 
-The webview runs under a strict CSP with a per-render nonce, and every piece of user content is
-rendered with `textContent`, never `innerHTML`.
+Issues and PRs welcome: [github.com/aftandilmmd/vscode-command-snippets](https://github.com/aftandilmmd/vscode-command-snippets)
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## License
 

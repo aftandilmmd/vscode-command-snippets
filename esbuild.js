@@ -23,8 +23,7 @@ function copyCodicons() {
 async function main() {
   copyCodicons();
 
-  const ctx = await esbuild.context({
-    entryPoints: ['src/extension.ts'],
+  const shared = {
     bundle: true,
     format: 'cjs',
     minify: production,
@@ -32,16 +31,30 @@ async function main() {
     sourcesContent: false,
     platform: 'node',
     target: 'node18',
-    outfile: 'dist/extension.js',
-    external: ['vscode'],
     logLevel: 'info'
-  });
+  };
+
+  const contexts = await Promise.all([
+    esbuild.context({
+      ...shared,
+      entryPoints: ['src/extension.ts'],
+      outfile: 'dist/extension.js',
+      external: ['vscode']
+    }),
+    // Standalone stdio MCP server: runs outside VS Code, so nothing is external.
+    esbuild.context({
+      ...shared,
+      entryPoints: ['src/mcp/server.ts'],
+      outfile: 'dist/mcp-server.js',
+      banner: { js: '#!/usr/bin/env node' }
+    })
+  ]);
 
   if (watch) {
-    await ctx.watch();
+    await Promise.all(contexts.map((ctx) => ctx.watch()));
   } else {
-    await ctx.rebuild();
-    await ctx.dispose();
+    await Promise.all(contexts.map((ctx) => ctx.rebuild()));
+    await Promise.all(contexts.map((ctx) => ctx.dispose()));
   }
 }
 

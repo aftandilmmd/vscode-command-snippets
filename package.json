@@ -5,8 +5,21 @@
   "version": "1.0.0",
   "publisher": "aftandilmmd",
   "license": "MIT",
+  "icon": "resources/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aftandilmmd/vscode-command-snippets.git"
+  },
+  "homepage": "https://github.com/aftandilmmd/vscode-command-snippets#readme",
+  "bugs": {
+    "url": "https://github.com/aftandilmmd/vscode-command-snippets/issues"
+  },
+  "galleryBanner": {
+    "color": "#0F172A",
+    "theme": "dark"
+  },
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.101.0"
   },
   "categories": [
     "Other"
@@ -68,6 +81,16 @@
         "command": "commandSnippets.import",
         "title": "Command Snippets: Import Data...",
         "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "commandSnippets.openDataFile",
+        "title": "Command Snippets: Open Data File",
+        "icon": "$(json)"
+      },
+      {
+        "command": "commandSnippets.copyMcpConfig",
+        "title": "Command Snippets: Copy MCP Server Config",
+        "icon": "$(plug)"
       }
     ],
     "menus": {
@@ -86,6 +109,16 @@
           "command": "commandSnippets.import",
           "when": "view == commandSnippets.view",
           "group": "1_data@2"
+        },
+        {
+          "command": "commandSnippets.openDataFile",
+          "when": "view == commandSnippets.view",
+          "group": "1_data@3"
+        },
+        {
+          "command": "commandSnippets.copyMcpConfig",
+          "when": "view == commandSnippets.view",
+          "group": "2_mcp@1"
         }
       ],
       "commandPalette": [
@@ -95,11 +128,185 @@
         }
       ]
     },
+    "configuration": {
+      "title": "Command Snippets",
+      "properties": {
+        "commandSnippets.workspaceFile.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Also read and write project snippets in .vscode/command-snippets.json, so they can be committed and shared with the team."
+        },
+        "commandSnippets.mcp.allowRun": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Let an AI agent connected through the MCP server ask to run a snippet. Every run still requires an explicit confirmation in VS Code, and agents can never pass a free-form command \u2014 only the id of a snippet you already saved."
+        }
+      }
+    },
     "keybindings": [
       {
         "command": "commandSnippets.run",
         "key": "ctrl+alt+r",
         "mac": "cmd+alt+r"
+      }
+    ],
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "commandSnippets.mcp",
+        "label": "Command Snippets"
+      }
+    ],
+    "languageModelTools": [
+      {
+        "name": "commandSnippets_list",
+        "displayName": "List command snippets",
+        "modelDescription": "Lists the user's saved terminal command snippets, optionally filtered by text or scope. Read-only.",
+        "toolReferenceName": "commandSnippets",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(terminal)",
+        "tags": [
+          "command-snippets",
+          "terminal"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Case-insensitive match over name, command and description."
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "global",
+                "workspace"
+              ],
+              "description": "Where the snippet lives: global (all projects) or workspace (this project's .vscode/command-snippets.json)."
+            },
+            "sort": {
+              "type": "string",
+              "enum": [
+                "name-asc",
+                "name-desc",
+                "created",
+                "updated",
+                "lastRun"
+              ]
+            }
+          },
+          "required": []
+        }
+      },
+      {
+        "name": "commandSnippets_create",
+        "displayName": "Create command snippet",
+        "modelDescription": "Saves a new terminal command snippet. Does not execute anything.",
+        "toolReferenceName": "newCommandSnippet",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(terminal)",
+        "tags": [
+          "command-snippets",
+          "terminal"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Short label shown in the sidebar."
+            },
+            "command": {
+              "type": "string",
+              "description": "The shell command to save."
+            },
+            "description": {
+              "type": "string"
+            },
+            "groupName": {
+              "type": "string",
+              "description": "Group to put it in; created if it does not exist."
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "global",
+                "workspace"
+              ],
+              "description": "Where the snippet lives: global (all projects) or workspace (this project's .vscode/command-snippets.json)."
+            }
+          },
+          "required": [
+            "name",
+            "command"
+          ]
+        }
+      },
+      {
+        "name": "commandSnippets_update",
+        "displayName": "Update command snippet",
+        "modelDescription": "Changes an existing snippet: its name, command, description, group or scope. Omitted fields stay as they are.",
+        "toolReferenceName": "updateCommandSnippet",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(terminal)",
+        "tags": [
+          "command-snippets",
+          "terminal"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "command": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "groupName": {
+              "type": "string",
+              "description": "Empty string moves it to Ungrouped."
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "global",
+                "workspace"
+              ],
+              "description": "Where the snippet lives: global (all projects) or workspace (this project's .vscode/command-snippets.json)."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        }
+      },
+      {
+        "name": "commandSnippets_delete",
+        "displayName": "Delete command snippet",
+        "modelDescription": "Deletes a saved snippet by id. The user is asked to confirm.",
+        "toolReferenceName": "deleteCommandSnippet",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(terminal)",
+        "tags": [
+          "command-snippets",
+          "terminal"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ]
+        }
       }
     ]
   },
@@ -109,17 +316,21 @@
     "watch": "node esbuild.js --watch",
     "package": "npm run typecheck && node esbuild.js --production",
     "typecheck": "tsc --noEmit",
-    "test": "tsc -p tsconfig.test.json && mocha out-test/test/**/*.test.js",
+    "test": "npm run compile && tsc -p tsconfig.test.json && mocha out-test/test/**/*.test.js",
     "vsce": "vsce package"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.6",
     "@types/node": "^20.11.0",
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "^1.101.0",
     "@vscode/codicons": "^0.0.35",
     "@vscode/vsce": "^2.24.0",
     "esbuild": "^0.20.0",
     "mocha": "^10.3.0",
     "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.6.5"
   }
 }

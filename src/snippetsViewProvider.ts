@@ -83,7 +83,12 @@ export class SnippetsViewProvider implements vscode.WebviewViewProvider {
   }
 
   private postState(): void {
-    this.post({ type: 'state', data: this.store.getData(), ui: this.getUi() });
+    this.post({
+      type: 'state',
+      data: this.store.getData(),
+      ui: this.getUi(),
+      hasWorkspace: this.store.hasWorkspace
+    });
   }
 
   private async handleMessage(raw: unknown): Promise<void> {
@@ -114,7 +119,8 @@ export class SnippetsViewProvider implements vscode.WebviewViewProvider {
           name: message.name,
           command: message.command,
           description: message.description,
-          groupId: message.groupId || undefined
+          groupId: message.groupId || undefined,
+          source: message.source
         });
         return;
 
@@ -123,7 +129,8 @@ export class SnippetsViewProvider implements vscode.WebviewViewProvider {
           name: message.name,
           command: message.command,
           description: message.description,
-          groupId: message.groupId
+          groupId: message.groupId,
+          source: message.source
         });
         return;
 
@@ -148,7 +155,7 @@ export class SnippetsViewProvider implements vscode.WebviewViewProvider {
         return;
 
       case 'createGroup':
-        await this.store.addGroup(message.name);
+        await this.store.addGroup(message.name, message.source);
         return;
 
       case 'renameGroup':
@@ -238,8 +245,12 @@ export class SnippetsViewProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
   <div class="tabs" role="tablist">
-    <button class="tab" id="tab-snippets" role="tab" data-tab="snippets">Snippets</button>
-    <button class="tab" id="tab-history" role="tab" data-tab="history">History</button>
+    <button class="tab" id="tab-snippets" role="tab" data-tab="snippets">
+      <span class="codicon codicon-symbol-snippet"></span> Snippets
+    </button>
+    <button class="tab" id="tab-history" role="tab" data-tab="history">
+      <span class="codicon codicon-history"></span> History
+    </button>
   </div>
 
   <section id="panel-snippets" class="panel">
@@ -280,6 +291,11 @@ export class SnippetsViewProvider implements vscode.WebviewViewProvider {
       <textarea id="form-command" rows="2" placeholder="npm test" required></textarea>
       <label for="form-description">Description</label>
       <input id="form-description" type="text" placeholder="Optional" />
+      <label for="form-scope" id="form-scope-label">Scope</label>
+      <select id="form-scope">
+        <option value="global">Global (all projects)</option>
+        <option value="workspace">This project</option>
+      </select>
       <label for="form-group">Group</label>
       <select id="form-group"></select>
       <div class="form-actions">
@@ -292,6 +308,11 @@ export class SnippetsViewProvider implements vscode.WebviewViewProvider {
       <h3>New group</h3>
       <label for="group-name">Group name</label>
       <input id="group-name" type="text" placeholder="Build" required />
+      <label for="group-scope" id="group-scope-label">Scope</label>
+      <select id="group-scope">
+        <option value="global">Global (all projects)</option>
+        <option value="workspace">This project</option>
+      </select>
       <div class="form-actions">
         <button type="submit" class="btn primary">Create</button>
         <button type="button" id="group-cancel" class="btn">Cancel</button>

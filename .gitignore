@@ -6,3 +6,6 @@ out-test/
 .DS_Store
 media/codicon.css
 media/codicon.ttf
+
+# Editor/harness state
+.claude/

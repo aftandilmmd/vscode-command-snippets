@@ -1,15 +1,30 @@
-import { SortKey, StoreData } from './types';
+import { SnippetSource, SortKey, StoreData } from './types';
 
 /** Messages sent from the webview to the extension host. */
 export type WebviewMessage =
   | { type: 'ready' }
   | { type: 'run'; snippetId: string }
   | { type: 'runCommand'; snippetName: string; command: string }
-  | { type: 'createSnippet'; name: string; command: string; description: string; groupId: string }
-  | { type: 'updateSnippet'; id: string; name: string; command: string; description: string; groupId: string }
+  | {
+      type: 'createSnippet';
+      name: string;
+      command: string;
+      description: string;
+      groupId: string;
+      source: SnippetSource;
+    }
+  | {
+      type: 'updateSnippet';
+      id: string;
+      name: string;
+      command: string;
+      description: string;
+      groupId: string;
+      source: SnippetSource;
+    }
   | { type: 'deleteSnippet'; id: string }
   | { type: 'moveSnippet'; id: string; groupId: string }
-  | { type: 'createGroup'; name: string }
+  | { type: 'createGroup'; name: string; source: SnippetSource }
   | { type: 'renameGroup'; id: string; name: string }
   | { type: 'deleteGroup'; id: string }
   | { type: 'saveHistoryEntry'; historyId: string }
@@ -19,7 +34,7 @@ export type WebviewMessage =
 
 /** Messages sent from the extension host to the webview. */
 export type HostMessage =
-  | { type: 'state'; data: StoreData; ui: UiState }
+  | { type: 'state'; data: StoreData; ui: UiState; hasWorkspace: boolean }
   | { type: 'focusNewSnippet' }
   | { type: 'focusNewGroup' }
   | { type: 'notice'; text: string };
@@ -37,6 +52,10 @@ const SORT_KEYS: readonly SortKey[] = ['name-asc', 'name-desc', 'created', 'upda
 
 function isSortKey(value: unknown): value is SortKey {
   return typeof value === 'string' && (SORT_KEYS as readonly string[]).includes(value);
+}
+
+function toSource(value: unknown): SnippetSource {
+  return value === 'workspace' ? 'workspace' : 'global';
 }
 
 function isStringArray(value: unknown): value is string[] {
@@ -68,7 +87,8 @@ export function parseWebviewMessage(raw: unknown): WebviewMessage | undefined {
             name: str('name'),
             command: str('command'),
             description: str('description'),
-            groupId: str('groupId')
+            groupId: str('groupId'),
+            source: toSource(message['source'])
           };
     case 'updateSnippet':
       return str('id') === ''
@@ -79,14 +99,17 @@ export function parseWebviewMessage(raw: unknown): WebviewMessage | undefined {
             name: str('name'),
             command: str('command'),
             description: str('description'),
-            groupId: str('groupId')
+            groupId: str('groupId'),
+            source: toSource(message['source'])
           };
     case 'deleteSnippet':
       return str('id') === '' ? undefined : { type: 'deleteSnippet', id: str('id') };
     case 'moveSnippet':
       return str('id') === '' ? undefined : { type: 'moveSnippet', id: str('id'), groupId: str('groupId') };
     case 'createGroup':
-      return str('name') === '' ? undefined : { type: 'createGroup', name: str('name') };
+      return str('name') === ''
+        ? undefined
+        : { type: 'createGroup', name: str('name'), source: toSource(message['source']) };
     case 'renameGroup':
       return str('id') === '' ? undefined : { type: 'renameGroup', id: str('id'), name: str('name') };
     case 'deleteGroup':

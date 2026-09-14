@@ -16,31 +16,52 @@ body {
   background: var(--vscode-sideBar-background);
 }
 
+/* Segmented control: a rounded track with a raised pill for the active tab. */
 .tabs {
   display: flex;
-  gap: 2px;
-  border-bottom: 1px solid var(--vscode-panel-border, transparent);
-  margin-bottom: 8px;
+  gap: 4px;
+  padding: 3px;
+  margin-bottom: 10px;
+  border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, transparent));
+  border-radius: 8px;
+  background: var(--vscode-editorWidget-background, var(--vscode-input-background));
 }
 
 .tab {
   flex: 1;
-  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
   background: transparent;
-  border: none;
-  border-bottom: 1px solid transparent;
   color: var(--vscode-descriptionForeground);
   cursor: pointer;
+  font-family: inherit;
   font-size: inherit;
+  transition: background 80ms ease, color 80ms ease;
+}
+
+.tab .codicon {
+  font-size: 14px;
 }
 
 .tab:hover {
   color: var(--vscode-foreground);
 }
 
+.tab:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
 .tab.active {
   color: var(--vscode-foreground);
-  border-bottom-color: var(--vscode-focusBorder);
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  border-color: var(--vscode-widget-border, var(--vscode-contrastBorder, transparent));
+  box-shadow: 0 1px 2px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.25));
 }
 
 .toolbar {
@@ -278,6 +299,20 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  font-size: 0.75em;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  vertical-align: middle;
 }
 
 .snippet-command,

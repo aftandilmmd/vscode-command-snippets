@@ -15,6 +15,8 @@
   let editingId = null;
   /** The first `state` message seeds the UI; later ones must not clobber it. */
   let uiHydrated = false;
+  /** False when no folder is open (or the project file is disabled): scope pickers stay hidden. */
+  let hasWorkspace = false;
 
   const el = {
     tabSnippets: /** @type {HTMLButtonElement} */ (document.getElementById('tab-snippets')),
@@ -33,10 +35,14 @@
     formName: /** @type {HTMLInputElement} */ (document.getElementById('form-name')),
     formCommand: /** @type {HTMLTextAreaElement} */ (document.getElementById('form-command')),
     formDescription: /** @type {HTMLInputElement} */ (document.getElementById('form-description')),
+    formScope: /** @type {HTMLSelectElement} */ (document.getElementById('form-scope')),
+    formScopeLabel: /** @type {HTMLElement} */ (document.getElementById('form-scope-label')),
     formGroup: /** @type {HTMLSelectElement} */ (document.getElementById('form-group')),
     formCancel: /** @type {HTMLButtonElement} */ (document.getElementById('form-cancel')),
     groupForm: /** @type {HTMLFormElement} */ (document.getElementById('group-form')),
     groupName: /** @type {HTMLInputElement} */ (document.getElementById('group-name')),
+    groupScope: /** @type {HTMLSelectElement} */ (document.getElementById('group-scope')),
+    groupScopeLabel: /** @type {HTMLElement} */ (document.getElementById('group-scope-label')),
     groupCancel: /** @type {HTMLButtonElement} */ (document.getElementById('group-cancel')),
     snippetList: /** @type {HTMLElement} */ (document.getElementById('snippet-list')),
     historyList: /** @type {HTMLElement} */ (document.getElementById('history-list')),
@@ -170,21 +176,40 @@
 
   // ---------- forms ----------
 
-  function fillGroupSelect(select, selectedId) {
+  /** @param {string} [source] when given, only groups of that source are listed */
+  function fillGroupSelect(select, selectedId, source) {
     select.textContent = '';
     const ungrouped = document.createElement('option');
     ungrouped.value = '';
     ungrouped.textContent = 'Ungrouped';
     select.appendChild(ungrouped);
-    data.groups
-      .slice()
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .forEach((group) => {
-        const option = document.createElement('option');
-        option.value = group.id;
-        option.textContent = group.name;
-        select.appendChild(option);
+
+    const byName = (a, b) => a.name.localeCompare(b.name);
+    const add = (group, parent) => {
+      const option = document.createElement('option');
+      option.value = group.id;
+      option.textContent = group.name;
+      parent.appendChild(option);
+    };
+
+    if (source) {
+      data.groups
+        .filter((group) => (group.source || 'global') === source)
+        .sort(byName)
+        .forEach((group) => add(group, select));
+    } else {
+      // Move picker: both sources, labelled, so a move can also change scope.
+      [['global', 'Global'], ['workspace', 'This project']].forEach((pair) => {
+        const members = data.groups.filter((group) => (group.source || 'global') === pair[0]).sort(byName);
+        if (members.length === 0) {
+          return;
+        }
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = pair[1];
+        members.forEach((group) => add(group, optgroup));
+        select.appendChild(optgroup);
       });
+    }
     select.value = selectedId || '';
   }
 
@@ -198,7 +223,8 @@
     el.formName.value = snippet ? snippet.name : '';
     el.formCommand.value = snippet ? snippet.command : '';
     el.formDescription.value = snippet && snippet.description ? snippet.description : '';
-    fillGroupSelect(el.formGroup, snippet ? snippet.groupId || '' : '');
+    el.formScope.value = (snippet && snippet.source) || 'global';
+    fillGroupSelect(el.formGroup, snippet ? snippet.groupId || '' : '', el.formScope.value);
     el.formName.focus();
   }
 
@@ -212,7 +238,16 @@
     el.snippetForm.hidden = true;
     el.groupForm.hidden = false;
     el.groupName.value = '';
+    el.groupScope.value = 'global';
     el.groupName.focus();
+  }
+
+  /** Scope pickers only make sense when there is a project file to write to. */
+  function applyScopeVisibility() {
+    el.formScope.hidden = !hasWorkspace;
+    el.formScopeLabel.hidden = !hasWorkspace;
+    el.groupScope.hidden = !hasWorkspace;
+    el.groupScopeLabel.hidden = !hasWorkspace;
   }
 
   function closeGroupForm() {
@@ -226,7 +261,13 @@
     const row = h('div', 'snippet');
 
     const main = h('div', 'snippet-main');
-    const name = h('div', 'snippet-name', snippet.name);
+    const name = h('div', 'snippet-name');
+    name.appendChild(document.createTextNode(snippet.name));
+    if (snippet.source === 'workspace') {
+      const badge = h('span', 'badge', 'project');
+      badge.title = 'Stored in .vscode/command-snippets.json';
+      name.appendChild(badge);
+    }
     name.title = snippet.name;
     main.appendChild(name);
 
@@ -256,7 +297,7 @@
         }
         const picker = /** @type {HTMLSelectElement} */ (document.createElement('select'));
         picker.className = 'move-select';
-        fillGroupSelect(picker, snippet.groupId || '');
+        fillGroupSelect(picker, snippet.groupId || '', undefined);
         picker.addEventListener('change', () => {
           post({ type: 'moveSnippet', id: snippet.id, groupId: picker.value });
         });
@@ -282,9 +323,12 @@
     const title = h('span', 'group-title', group.name);
     title.title = group.name;
     header.appendChild(title);
+    if (group.source === 'workspace') {
+      header.appendChild(h('span', 'badge', 'project'));
+    }
     header.appendChild(h('span', 'group-count', String(snippets.length)));
 
-    if (group.id !== UNGROUPED) {
+    if (group.id.indexOf(UNGROUPED) !== 0) {
       header.appendChild(
         iconButton('edit', 'Rename group', () => {
           const input = /** @type {HTMLInputElement} */ (document.createElement('input'));
@@ -356,7 +400,23 @@
     });
 
     const ungrouped = sorted(visible.filter((snippet) => !snippet.groupId));
-    el.snippetList.appendChild(renderGroupSection({ id: UNGROUPED, name: 'Ungrouped' }, ungrouped));
+    if (hasWorkspace) {
+      // Ungrouped splits per source so it stays obvious where a snippet lives.
+      const projectUngrouped = ungrouped.filter((snippet) => snippet.source === 'workspace');
+      if (projectUngrouped.length > 0) {
+        el.snippetList.appendChild(
+          renderGroupSection({ id: UNGROUPED + ':workspace', name: 'Ungrouped', source: 'workspace' }, projectUngrouped)
+        );
+      }
+      el.snippetList.appendChild(
+        renderGroupSection(
+          { id: UNGROUPED, name: 'Ungrouped' },
+          ungrouped.filter((snippet) => snippet.source !== 'workspace')
+        )
+      );
+    } else {
+      el.snippetList.appendChild(renderGroupSection({ id: UNGROUPED, name: 'Ungrouped' }, ungrouped));
+    }
   }
 
   function renderHistory() {
@@ -421,7 +481,7 @@
     if (!el.snippetForm.hidden && editingId) {
       // Keep the group dropdown of an open edit form in sync with group changes.
       const current = el.formGroup.value;
-      fillGroupSelect(el.formGroup, current);
+      fillGroupSelect(el.formGroup, current, el.formScope.value);
     }
   }
 
@@ -457,6 +517,10 @@
     el.newDropdown.hidden = !open;
     el.newToggle.setAttribute('aria-expanded', String(open));
   }
+
+  el.formScope.addEventListener('change', () => {
+    fillGroupSelect(el.formGroup, '', el.formScope.value);
+  });
 
   el.newToggle.addEventListener('click', (event) => {
     event.stopPropagation();
@@ -499,7 +563,8 @@
       name: el.formName.value,
       command: command,
       description: el.formDescription.value,
-      groupId: el.formGroup.value
+      groupId: el.formGroup.value,
+      source: hasWorkspace ? el.formScope.value : 'global'
     };
     if (editingId) {
       post(Object.assign({ type: 'updateSnippet', id: editingId }, payload));
@@ -516,7 +581,7 @@
       el.groupName.focus();
       return;
     }
-    post({ type: 'createGroup', name: name });
+    post({ type: 'createGroup', name: name, source: hasWorkspace ? el.groupScope.value : 'global' });
     closeGroupForm();
   });
 
@@ -530,6 +595,8 @@
     switch (message.type) {
       case 'state':
         data = message.data;
+        hasWorkspace = message.hasWorkspace === true;
+        applyScopeVisibility();
         if (!uiHydrated) {
           // The webview owns UI state once it is live; only seed it on the first push
           // so a store change never resets a search the user is in the middle of typing.
@@ -560,6 +627,7 @@
     ui = Object.assign(ui, restored);
     uiHydrated = true;
   }
+  applyScopeVisibility();
   render();
   post({ type: 'ready' });
 

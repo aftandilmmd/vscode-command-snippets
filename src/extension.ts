@@ -1,33 +1,150 @@
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { SnippetRunner } from './runner';
 import { SnippetsViewProvider } from './snippetsViewProvider';
+import { FileStorage, globalDataPath, workspaceDataPath } from './storage/fileStorage';
+import { migrateFromGlobalState } from './storage/migrate';
+import { registerLanguageModelTools } from './lmTools';
+import { registerMcpServerProvider } from './mcpProvider';
+import { RunRequestService } from './runRequests';
 import { Store, normalize } from './store';
 import { TerminalManager } from './terminal';
 
-export function activate(context: vscode.ExtensionContext): void {
-  const store = new Store(context.globalState);
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  const globalDoc = new FileStorage(globalDataPath());
+  const migration = await migrateFromGlobalState(context.globalState, globalDoc);
+
+  let workspaceDoc = createWorkspaceDoc();
+  const store = new Store(globalDoc, workspaceDoc);
   const terminals = new TerminalManager();
   const runner = new SnippetRunner(store, terminals);
   const provider = new SnippetsViewProvider(context, store, runner);
+  const runRequests = new RunRequestService(store, runner, context.extension.packageJSON.version ?? '0.0.0');
+  void runRequests.start();
+
+  // External edits (a hand-edit, a git pull, or an AI agent writing the file) reload the store.
+  const watchGlobal = watchFile(globalDoc, () => store.reload());
+  let watchWorkspace = workspaceDoc ? watchFile(workspaceDoc, () => store.reload()) : undefined;
+
+  const rewire = (): void => {
+    watchWorkspace?.dispose();
+    workspaceDoc = createWorkspaceDoc();
+    store.setWorkspaceDoc(workspaceDoc);
+    watchWorkspace = workspaceDoc ? watchFile(workspaceDoc, () => store.reload()) : undefined;
+  };
+
+  const mcpProvider = registerMcpServerProvider(context);
+  if (mcpProvider) {
+    context.subscriptions.push(mcpProvider);
+  }
+  context.subscriptions.push(...registerLanguageModelTools(store));
 
   context.subscriptions.push(
     store,
     terminals,
     provider,
+    runRequests,
+    watchGlobal,
+    { dispose: () => watchWorkspace?.dispose() },
+    { dispose: () => void globalDoc.flush() },
+    vscode.workspace.onDidChangeWorkspaceFolders(rewire),
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration('commandSnippets.workspaceFile.enabled')) {
+        rewire();
+      }
+    }),
     vscode.window.registerWebviewViewProvider(SnippetsViewProvider.viewType, provider, {
       webviewOptions: { retainContextWhenHidden: true }
     }),
     vscode.commands.registerCommand('commandSnippets.run', () => quickPickRun(store, runner)),
     vscode.commands.registerCommand('commandSnippets.newSnippet', () => provider.focusNewSnippet()),
     vscode.commands.registerCommand('commandSnippets.newGroup', () => provider.focusNewGroup()),
-    vscode.commands.registerCommand('commandSnippets.refresh', () => provider.refresh()),
+    vscode.commands.registerCommand('commandSnippets.refresh', () => {
+      store.reload();
+      provider.refresh();
+    }),
     vscode.commands.registerCommand('commandSnippets.export', () => exportData(store)),
-    vscode.commands.registerCommand('commandSnippets.import', () => importData(store))
+    vscode.commands.registerCommand('commandSnippets.import', () => importData(store)),
+    vscode.commands.registerCommand('commandSnippets.openDataFile', () => openDataFile(globalDoc.filePath)),
+    vscode.commands.registerCommand('commandSnippets.copyMcpConfig', () => copyMcpConfig(context))
   );
+
+  if (migration.migrated) {
+    void vscode.window.showInformationMessage(
+      `Command Snippets: moved ${migration.snippets} snippet(s) into ${tildify(globalDoc.filePath)}.`
+    );
+  }
 }
 
 export function deactivate(): void {
   // Everything is disposed through context.subscriptions.
+}
+
+/** The project document, when a folder is open and the feature is enabled. */
+function createWorkspaceDoc(): FileStorage | undefined {
+  const enabled = vscode.workspace
+    .getConfiguration('commandSnippets')
+    .get<boolean>('workspaceFile.enabled', true);
+  const folder = vscode.workspace.workspaceFolders?.[0];
+  if (!enabled || !folder || folder.uri.scheme !== 'file') {
+    return undefined;
+  }
+  return new FileStorage(workspaceDataPath(folder.uri.fsPath));
+}
+
+/** Watches one file, ignoring the events caused by our own writes. */
+function watchFile(doc: FileStorage, onExternalChange: () => void): vscode.Disposable {
+  const watcher = vscode.workspace.createFileSystemWatcher(
+    new vscode.RelativePattern(vscode.Uri.file(path.dirname(doc.filePath)), path.basename(doc.filePath))
+  );
+  const handle = async (uri: vscode.Uri): Promise<void> => {
+    let text = '';
+    try {
+      text = Buffer.from(await vscode.workspace.fs.readFile(uri)).toString('utf8');
+    } catch {
+      // Deleted — fall through and reload, which yields empty data for that document.
+    }
+    if (doc.isOwnWrite(text)) {
+      return;
+    }
+    onExternalChange();
+  };
+  watcher.onDidChange((uri) => void handle(uri));
+  watcher.onDidCreate((uri) => void handle(uri));
+  watcher.onDidDelete(() => onExternalChange());
+  return watcher;
+}
+
+function tildify(filePath: string): string {
+  const home = process.env['HOME'] ?? process.env['USERPROFILE'] ?? '';
+  return home && filePath.startsWith(home) ? `~${filePath.slice(home.length)}` : filePath;
+}
+
+async function openDataFile(filePath: string): Promise<void> {
+  const document = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
+  await vscode.window.showTextDocument(document);
+}
+
+/** Hands the user a ready-to-paste MCP client config with the bundled server's absolute path. */
+async function copyMcpConfig(context: vscode.ExtensionContext): Promise<void> {
+  const serverPath = vscode.Uri.joinPath(context.extensionUri, 'dist', 'mcp-server.js').fsPath;
+  const config = {
+    mcpServers: {
+      'command-snippets': { command: 'node', args: [serverPath] }
+    }
+  };
+  await vscode.env.clipboard.writeText(JSON.stringify(config, null, 2));
+
+  const cli = `claude mcp add command-snippets -- node ${serverPath}`;
+  const answer = await vscode.window.showInformationMessage(
+    'MCP config copied to the clipboard.',
+    { modal: false },
+    'Copy CLI command'
+  );
+  if (answer === 'Copy CLI command') {
+    await vscode.env.clipboard.writeText(cli);
+    void vscode.window.setStatusBarMessage('Command Snippets: CLI command copied', 2000);
+  }
 }
 
 interface SnippetPick extends vscode.QuickPickItem {
