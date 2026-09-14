@@ -20,6 +20,26 @@ function copyCodicons() {
   console.log('[codicons] copied codicon.css + codicon.ttf into media/');
 }
 
+/** Keeps the npm package (`command-snippets-mcp`) in sync with the bundled server. */
+function stageMcpPackage() {
+  const from = path.join(__dirname, 'dist', 'mcp-server.js');
+  const to = path.join(__dirname, 'mcp', 'mcp-server.js');
+  if (!fs.existsSync(from)) {
+    return;
+  }
+  fs.copyFileSync(from, to);
+
+  // The npm package version follows the extension version, so there is one number to bump.
+  const extensionPkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+  const mcpPkgPath = path.join(__dirname, 'mcp', 'package.json');
+  const mcpPkg = JSON.parse(fs.readFileSync(mcpPkgPath, 'utf8'));
+  if (mcpPkg.version !== extensionPkg.version) {
+    mcpPkg.version = extensionPkg.version;
+    fs.writeFileSync(mcpPkgPath, `${JSON.stringify(mcpPkg, null, 2)}\n`);
+    console.log(`[mcp] version synced to ${extensionPkg.version}`);
+  }
+}
+
 async function main() {
   copyCodicons();
 
@@ -55,6 +75,7 @@ async function main() {
   } else {
     await Promise.all(contexts.map((ctx) => ctx.rebuild()));
     await Promise.all(contexts.map((ctx) => ctx.dispose()));
+    stageMcpPackage();
   }
 }
 

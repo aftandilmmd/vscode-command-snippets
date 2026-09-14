@@ -91,6 +91,11 @@
         "command": "commandSnippets.copyMcpConfig",
         "title": "Command Snippets: Copy MCP Server Config",
         "icon": "$(plug)"
+      },
+      {
+        "command": "commandSnippets.setupMcp",
+        "title": "Command Snippets: Set Up AI Client (MCP)...",
+        "icon": "$(sparkle)"
       }
     ],
     "menus": {
@@ -119,6 +124,11 @@
           "command": "commandSnippets.copyMcpConfig",
           "when": "view == commandSnippets.view",
           "group": "2_mcp@1"
+        },
+        {
+          "command": "commandSnippets.setupMcp",
+          "when": "view == commandSnippets.view",
+          "group": "2_mcp@0"
         }
       ],
       "commandPalette": [
@@ -317,7 +327,8 @@
     "package": "npm run typecheck && node esbuild.js --production",
     "typecheck": "tsc --noEmit",
     "test": "npm run compile && tsc -p tsconfig.test.json && mocha out-test/test/**/*.test.js",
-    "vsce": "vsce package"
+    "vsce": "vsce package",
+    "publish:mcp": "npm run package && npm publish ./mcp --access public"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.6",

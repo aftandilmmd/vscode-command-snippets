@@ -9,3 +9,4 @@ media/codicon.ttf
 
 # Editor/harness state
 .claude/
+mcp/mcp-server.js

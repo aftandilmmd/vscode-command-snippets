@@ -27,9 +27,13 @@ First release.
   `~/.command-snippets/data.json` globally and `.vscode/command-snippets.json` per project, so a
   team can commit its shared snippets. Data from earlier builds is migrated out of `globalState`
   automatically.
-- A bundled stdio MCP server (`dist/mcp-server.js`) that lets Claude Code, Cursor, Claude Desktop
-  and other MCP clients list, create, edit, group and delete snippets, plus a `snippets://all`
-  resource. `Command Snippets: Copy MCP Server Config` puts a ready-made config on the clipboard.
+- A stdio MCP server that lets Claude Code, Cursor, Claude Desktop and other MCP clients list,
+  create, edit, group and delete snippets, plus a `snippets://all` resource. It ships both inside
+  the extension and on npm as [`command-snippets-mcp`](https://www.npmjs.com/package/command-snippets-mcp),
+  so client configs need no extension path.
+- `Command Snippets: Set Up AI Client (MCP)…` writes the server entry into Cursor, Claude Desktop
+  or Windsurf, or runs the `claude` CLI for Claude Code — existing servers in those files are left
+  untouched.
 - Language Model Tools and an MCP server definition provider, so Copilot agent mode can manage
   snippets inside VS Code without any configuration.
 

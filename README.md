@@ -53,10 +53,23 @@ Command Snippets bundles an MCP server, so Claude Code, Cursor, Claude Desktop o
 can list, create, edit, group and delete your snippets — and the sidebar updates the moment they
 do.
 
-Run **Command Snippets: Copy MCP Server Config** from the Command Palette, then paste. Or:
+Setup is one command, no paths to find: Command Palette → **Command Snippets: Set Up AI Client
+(MCP)…** → pick your client. It writes the entry into Cursor, Claude Desktop or Windsurf for you,
+or runs the `claude` CLI for Claude Code.
+
+Doing it by hand is one line too:
 
 ```bash
-claude mcp add command-snippets -- node <extension-path>/dist/mcp-server.js
+claude mcp add command-snippets -- npx -y command-snippets-mcp
+```
+
+```jsonc
+// Cursor: ~/.cursor/mcp.json — Claude Desktop: claude_desktop_config.json
+{
+  "mcpServers": {
+    "command-snippets": { "command": "npx", "args": ["-y", "command-snippets-mcp"] }
+  }
+}
 ```
 
 In VS Code itself there is nothing to configure at all: Copilot agent mode picks up
@@ -92,7 +105,7 @@ the sidebar immediately. Export and import as JSON any time.
 | Run Snippet | `Cmd+Alt+R` / `Ctrl+Alt+R` |
 | New Snippet · New Group · Refresh | — |
 | Export Data… · Import Data… · Open Data File | — |
-| Copy MCP Server Config | — |
+| Set Up AI Client (MCP)… · Copy MCP Server Config | — |
 
 | Setting | Default | |
 | --- | --- | --- |

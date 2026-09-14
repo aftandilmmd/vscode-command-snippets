@@ -6,6 +6,7 @@ import { FileStorage, globalDataPath, workspaceDataPath } from './storage/fileSt
 import { migrateFromGlobalState } from './storage/migrate';
 import { registerLanguageModelTools } from './lmTools';
 import { registerMcpServerProvider } from './mcpProvider';
+import { mcpConfigJson, setUpMcpClient } from './mcpSetup';
 import { RunRequestService } from './runRequests';
 import { Store, normalize } from './store';
 import { TerminalManager } from './terminal';
@@ -66,6 +67,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('commandSnippets.export', () => exportData(store)),
     vscode.commands.registerCommand('commandSnippets.import', () => importData(store)),
     vscode.commands.registerCommand('commandSnippets.openDataFile', () => openDataFile(globalDoc.filePath)),
+    vscode.commands.registerCommand('commandSnippets.setupMcp', () => setUpMcpClient()),
     vscode.commands.registerCommand('commandSnippets.copyMcpConfig', () => copyMcpConfig(context))
   );
 
@@ -125,25 +127,23 @@ async function openDataFile(filePath: string): Promise<void> {
   await vscode.window.showTextDocument(document);
 }
 
-/** Hands the user a ready-to-paste MCP client config with the bundled server's absolute path. */
+/** Hands the user a ready-to-paste MCP client config. */
 async function copyMcpConfig(context: vscode.ExtensionContext): Promise<void> {
-  const serverPath = vscode.Uri.joinPath(context.extensionUri, 'dist', 'mcp-server.js').fsPath;
-  const config = {
-    mcpServers: {
-      'command-snippets': { command: 'node', args: [serverPath] }
-    }
-  };
-  await vscode.env.clipboard.writeText(JSON.stringify(config, null, 2));
-
-  const cli = `claude mcp add command-snippets -- node ${serverPath}`;
+  await vscode.env.clipboard.writeText(mcpConfigJson());
   const answer = await vscode.window.showInformationMessage(
-    'MCP config copied to the clipboard.',
-    { modal: false },
-    'Copy CLI command'
+    'MCP config copied. It uses "npx -y command-snippets-mcp", so there is no path to keep in sync.',
+    'Set up a client for me',
+    'Copy bundled server path'
   );
-  if (answer === 'Copy CLI command') {
-    await vscode.env.clipboard.writeText(cli);
-    void vscode.window.setStatusBarMessage('Command Snippets: CLI command copied', 2000);
+  if (answer === 'Set up a client for me') {
+    await setUpMcpClient();
+    return;
+  }
+  if (answer === 'Copy bundled server path') {
+    // Escape hatch for machines without npm access.
+    const serverPath = vscode.Uri.joinPath(context.extensionUri, 'dist', 'mcp-server.js').fsPath;
+    await vscode.env.clipboard.writeText(serverPath);
+    void vscode.window.setStatusBarMessage('Command Snippets: server path copied', 2000);
   }
 }
 
