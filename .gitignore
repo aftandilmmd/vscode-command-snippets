@@ -1,0 +1,8 @@
+node_modules/
+dist/
+out/
+out-test/
+*.vsix
+.DS_Store
+media/codicon.css
+media/codicon.ttf
