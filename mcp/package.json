@@ -1,13 +1,13 @@
 {
   "name": "command-snippets-mcp",
   "version": "1.0.0",
-  "description": "MCP server for the Command Snippets VS Code extension — manage your saved terminal commands from Claude, Cursor or any MCP client.",
+  "description": "MCP server for the Command Snippets VS Code extension \u2014 manage your saved terminal commands from Claude, Cursor or any MCP client.",
   "license": "MIT",
   "author": "aftandilmmd",
   "homepage": "https://github.com/aftandilmmd/vscode-command-snippets#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/aftandilmmd/vscode-command-snippets.git",
+    "url": "git+https://github.com/aftandilmmd/vscode-command-snippets.git",
     "directory": "mcp"
   },
   "bugs": {
