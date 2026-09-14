@@ -11,3 +11,7 @@ tsconfig.json
 tsconfig.test.json
 **/*.map
 **/*.ts
+mcp/**
+CHANGELOG.md.orig
+*.vsix
+*.tgz
